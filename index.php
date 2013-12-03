@@ -1,3 +1,12 @@
+<?php
+    
+    // TO DO: see https://github.com/focuslabllc/deployment_hooks.ee2_addon for integration
+    
+    // assumes current file path is '/system/.db/index.php'
+    // assumes we want to save SQL dumps to '/.db/'
+    // assumes '/.db/' has right permissions (755/777)
+    
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
