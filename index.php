@@ -19,7 +19,9 @@
      <div class="container">
         <div class="row">
             <h1>ExpressionEngine SQL dumper</h1>
-<?php
+            
+<?php        
+        
     if (count($_POST) > 0) {
         $system_path = '';
         if ($system_path == '')
@@ -32,7 +34,7 @@
     	{
     		$system_path = realpath($system_path).'/';
         }
-        
+         
         $system_path = rtrim($system_path, '/');
         
         // assumes current file path is /system/.db/index.php
@@ -44,17 +46,21 @@
     	
     	define('BASEPATH', str_replace("\\", "/", $system_path.'codeigniter/system/'));
         
-        
         include_once($system_path.'expressionengine/config/environment.php');
         include_once($system_path.'expressionengine/config/database.php');
         
         $mysqli = new mysqli($db['expressionengine']['hostname'], $db['expressionengine']['username'], $db['expressionengine']['password'], $db['expressionengine']['database']);
+        
         
         /* check connection */
         if (mysqli_connect_errno()) {
             printf("Connect failed: %s\n", mysqli_connect_error());
             exit();
         }
+        
+        $sql = $dir.'/'.$db['expressionengine']['database'].'-'.NSM_ENV.'.sql';
+        $sql_handle = fopen($sql, "w+");
+        
         echo '<table class="table table-striped">';
         /* return name of current default database */
         if ($result = $mysqli->query("SHOW TABLE STATUS FROM `".$db['expressionengine']['database']."`")) {
@@ -70,15 +76,17 @@
                     $output .= "`".$rowCols[0]."` ".$rowCols[1];
                     if ($rowCols[2] == 'NO') $output .= " NOT NULL";
                     if ($rowCols[3] == 'PRI') $primary[] = "`".$rowCols[0]."`";
-                    if ($rowCols[3] == 'MUL') $keys[] = "KEY `".$rowCols[0]."` (`".$rowCols[0]."`)";
+                    if ($rowCols[1] == 'text' && $rowCols[3] == 'MUL') $keys[] = "FULLTEXT KEY `".$rowCols[0]."` (`".$rowCols[0]."`)";
+                    elseif ($rowCols[3] == 'MUL') $keys[] = "KEY `".$rowCols[0]."` (`".$rowCols[0]."`)";
                     if ($rowCols[4] != '') $output .= " DEFAULT '".$rowCols[4]."'";
-                    if ($rowCols[5] != '') $output .= strtoupper($rowCols[4]);
+                    if ($rowCols[5] != '') $output .= " " . strtoupper($rowCols[5]);
                     $output .= ",";
                 }
                 
-                if (isset($primary)) $output .= " PRIMARY KEY (".implode($primary,',')."),";
+                if (isset($primary)) $output .= " PRIMARY KEY (".implode($primary,',').")";
+                if (isset($primary) && isset($keys)) $output .= ",";
                 if (isset($keys)) $output .= " ".implode($keys,', ');
-                $output = substr($output, 0, -1);
+                // $output = substr($output, 0, -1);
                 $output .= ')';
                 $output .= ' ENGINE='.$row[1] . " DEFAULT CHARSET=utf8;\n";
                 
@@ -90,20 +98,22 @@
                     foreach ($dataCols as  $value) {
                         // is a string (including decimal integers)
                         if (strpos($value,'.') === false && is_numeric($value)) $dump[] = $value;
-                        else $dump[] = "'".$value."'";
+                        else $dump[] = "'".addslashes($value)."'";
                     } 
                     $dataVals[] = implode($dump,',');
                     unset($dump);
                 }
-                
+                fwrite($sql_handle, $output);
                 if (isset($dataVals)) {
-                    $insert = "INSERT INTO `exp_accessories` (".implode($fields,',').") VALUES \n\t(";
-                    $insert .= implode($dataVals,",\n\t");
+                    $insert = "INSERT INTO `".$row[0]."` (".implode($fields,',').") VALUES \n\t(";
+                    $insert .= implode($dataVals,"),\n\t(");
                     $insert .= ");\n";
                     // echo $insert;
                     if (fwrite($handle, $insert)) echo count($dataVals)." rows added";
+                    fwrite($sql_handle, $insert);    
                 }
                 echo '</td></tr>';
+                
                 unset($primary);
                 unset($keys);
                 unset($fields);
@@ -113,7 +123,9 @@
             }
             $result->close();
         }  
+        
         echo '</table>';
+        fclose($sql_handle);
     
     } else {
         ?>
